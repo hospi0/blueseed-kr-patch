@@ -22,7 +22,7 @@ def blocks(d, F):
     for mi, (o, b) in enumerate(mes.messages(d)):
         cur = []; bi = 0
         for seg in ocrprep.segments(b):
-            if seg[:2] == b'\xff\xff' or not seg or seg[:1] == b'\x00':
+            if build.is_cmd(seg):                    # 인라인 명령으로 시작하는 글 줄은 글(build.is_cmd)
                 if cur:
                     out.append((mi, bi, '\\n'.join(cur))); bi += 1; cur = []
                 continue

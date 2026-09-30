@@ -41,6 +41,16 @@ def tokens(s, half, full):
     return out
 
 
+def is_cmd(s):
+    """조각이 명령 줄인가. ★글 줄이 인라인 명령으로 «시작»할 수도 있다(FF FF 1E 28 01 04 01 + 「ただ……」, 전 파일 5곳)
+    — 명령 인수 뒤에 글자가 남으면 글 줄이다(2026-09-29 실기: 명령으로 보고 원본 번호를 복사해 깨진 글자가 겹쳐 그려짐)"""
+    if not s or s[:1] == b'\x00':
+        return True
+    if s[:2] != b'\xff\xff':
+        return False
+    return not (len(s) > 2 and s[2] == 0x1E and len(s) > 3 + INLINE[0x1E])
+
+
 def hk(g):
     return hashlib.sha1(g).hexdigest()[:16]
 
@@ -53,7 +63,7 @@ def parse(d):
     for o, b in mes.messages(d):
         segs = []
         for s in ocrprep.segments(b):
-            if s[:2] == b'\xff\xff' or not s or s[:1] == b'\x00':
+            if is_cmd(s):
                 segs.append(('c', s))
             else:
                 segs.append(('t', tokens(s, half, full)))
@@ -104,7 +114,8 @@ FACE_LINES, NOFACE_LINES = 5, 3         # 창 한 번 줄 수(원문 최대)
 FULL_TESTED = 722                       # 실기로 확인한 전각 칸 수(PoC 2차). 넘으면 경고
 TSV = os.path.join(ROOT, 'my files', 'tsv')
 EXE_TSV = os.path.join(ROOT, 'work', 'trans', 'exe', 'blueseed_실행파일.tsv')   # 실행 파일 번역 작업본(아라가미 통일·줄임 반영)
-EXE_HALF = '0123456789abcdefghijklmnopqrstuvwxyz_?! FLGMS-YD+AIEX%V'
+INLINE_TSV = os.path.join(ROOT, 'work', 'trans', 'inline1e.tsv')   # 줄 머리 인라인 명령 5곳 보강(2026-09-30)
+EXE_HALF ='0123456789abcdefghijklmnopqrstuvwxyz_?! FLGMS-YD+AIEX%V'
 if '--tsv' in sys.argv:                 # 시험용 번역 폴더(예: work/trans/test)
     TSV = os.path.abspath(sys.argv[sys.argv.index('--tsv') + 1])
 # 반각 쉼표(원본 반각 51종에 없음) — 마침표(12‥13행 3‥4열) 모양에 꼬리
@@ -181,6 +192,11 @@ def load_tr():
                 t = c[5].rstrip('\r\n').replace(chr(92) * 2 + 'n', chr(92) + 'n')   # 두 겹 이스케이프 줄바꿈도 받는다
                 assert tr.get(c[0], t) == t, ('번역이 두 파일에서 다름', c[0], p)
                 tr[c[0]] = t
+    # 인라인 명령으로 시작하는 줄(build.is_cmd) 보강 — 추출에서 빠졌던 줄을 더한 덩어리라 같은 ID 를 «덮어쓴다»
+    for ln in open(INLINE_TSV, encoding='utf-8').read().split('\n')[1:]:
+        c = ln.split('\t')
+        if len(c) >= 6 and c[5].strip(' \r\n'):
+            tr[c[0]] = c[5].rstrip('\r\n')
     return tr
 
 

@@ -16,3 +16,4 @@
 !work/trans/exe/
 !work/trans/exe/*.py
 !work/trans/exe/fix.tsv
+!work/trans/inline1e.tsv
